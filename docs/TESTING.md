@@ -21,7 +21,17 @@ DiskInfo (C++, build อ้างอิง Windows) — ยืนยันแล
   "/p:OutDir=<dir>\bin\" "/p:IntDir=<dir>\obj\" /m /nologo /v:m
 ```
 
-ผล: `Build succeeded` 0 error 1 warning ได้ `DiskInfo64.exe` (2,883,072 bytes) ใช้ `OutDir`/`IntDir` นอก repo เพื่อไม่ให้สร้างไฟล์ build ใน working tree ยังไม่ได้ build ผ่าน `DiskInfo.sln` ทั้งชุดและยังไม่มี test อัตโนมัติของ DiskInfo (จะเติมเมื่อมี CLI/ไลบรารีใหม่)
+ผล: `Build succeeded` 0 error 1 warning ได้ `DiskInfo64.exe` (2,883,072 bytes) ใช้ `OutDir`/`IntDir` นอก repo แต่ `.vcxproj` เดิมตั้งไฟล์ PDB ไว้ที่ `Build\<config><platform>\<toolset>.pdb` ใต้โฟลเดอร์ซอร์ส จึงมี `CrystalDiskInfo\Build\Releasex64\145.pdb` (~3 MB) โผล่ใน working tree ต้องลบก่อน commit (พบและลบแล้วครั้งหนึ่ง) ยังไม่ได้ build ผ่าน `DiskInfo.sln` ทั้งชุดและยังไม่มี test อัตโนมัติของ DiskInfo
+
+**DiskInfoCore.dll** (เฟส 1, โปรเจกต์ใหม่ `CrystalDiskInfo\DiskInfoCore\`, ไม่แก้ไฟล์เดิม) build ด้วยคำสั่งเดียวกันแต่ชี้ไปที่ `DiskInfoCore.vcxproj` (output ไป `DiskInfoCore\Build\` ซึ่ง git ignore แล้ว):
+
+```powershell
+& "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe" `
+  CrystalDiskInfo\DiskInfoCore\DiskInfoCore.vcxproj /p:Configuration=Release /p:Platform=x64 `
+  /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0.26100.0 /m /nologo /v:m
+```
+
+ผล (2026-10-12): Build succeeded 0 error 0 warning, `DiskInfoCore.dll` ~598 KB, export 6 ชื่อ ทดสอบเรียกจริงด้วยสคริปต์ P/Invoke (ไม่อยู่ใน repo — ยังไม่มี test อัตโนมัติ): สิทธิ์ปกติ → `di_scan` คืน `DI_E_ACCESS` (-2) และ 0 ดิสก์; admin → 3 ดิสก์ (TOSHIBA SATA, WDS NVMe, Seagate USB ผ่าน SAT) health = Good ทั้งหมด ใช้เวลา 3.1–4.3 วินาที และไฟล์ `.log` ข้าง host ไม่ถูกลบ ดูรายละเอียดและข้อสังเกตที่ `docs/CORE_ABI.md`
 
 ข้อกำหนดเบื้องต้น:
 

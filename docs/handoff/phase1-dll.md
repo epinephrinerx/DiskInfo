@@ -7,6 +7,8 @@ Requirement: R-003 (🔨) ผ่านการต่อ R-019 ใน `D:\Dev\Ap
 
 > **อัปเดต 2026-10-11:** ตรวจพบว่าสาเหตุอุณหภูมิ n/a คือ property ID ผิดใน SystemMonitor (ดู `phase2a-sysmon-temp-id.md`) ลำดับที่เสนอใหม่: 2a ก่อน แล้วเฟส 1 นี้ยังจำเป็นสำหรับ USB HDD (R-003 ส่วนที่เหลือ) และ R-002/R-001 — รอผู้ใช้รับรองลำดับ
 
+> **สถานะ 2026-10-12 — ข้อยกเว้นของ workflow:** agy ติดโควตา (429, รีเซ็ตอีก ~42 ชม., ลองทั้ง Gemini 3.8 Flash Medium และ 3.1 Pro High ได้ผลเดียวกัน) ผู้ใช้อนุมัติให้ Coding Owner เขียนเฟสนี้เอง (ทางเลือก 3) ไฟล์ใหม่ใน `CrystalDiskInfo/DiskInfoCore/` เขียนโดย Claude Code ไม่ใช่ agy; Reviewer2 (Codex) ตรวจแล้วไม่พบ defect, Reviewer1 (Opus) กำลังตรวจ ผล build/ทดสอบอยู่ใน `docs/TESTING.md` และ `docs/CORE_ABI.md` ข้อ 1b–6
+
 ## Objective
 สร้าง Windows DLL (`DiskInfoCore.dll`, x64) ที่ห่อ `CAtaSmart` เดิม และเปิดฟังก์ชันตามสัญญา `docs/CORE_ABI.md` ให้ C# เรียกผ่าน P/Invoke ได้ ในเฟสนี้ทำเฉพาะ `di_abi_version`, `di_open`, `di_close`, `di_scan`, `di_disk_count`, `di_disk_info` (ยังไม่ต้องทำ `di_attr_*`)
 
@@ -36,6 +38,11 @@ Requirement: R-003 (🔨) ผ่านการต่อ R-019 ใน `D:\Dev\Ap
 ## Commands ที่ Coding Owner รันแล้วในเฟส 0
 - `dotnet test SysMonitor.Tests` ที่ SystemMonitor4.0 → 312/312 ผ่าน
 - ติดตั้ง MFC/ATL (exit 0) แล้ว `MSBuild DiskInfo.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v145 /p:WindowsTargetPlatformVersion=10.0.26100.0` → Build succeeded, 0 error, ได้ `DiskInfo64.exe`
+
+## ข้อกำหนดเพิ่มจากการอ่านโค้ด (2026-10-12)
+- `di_scan` ต้อง `CoInitializeEx` บน thread ที่เรียก (Init ไม่ทำเอง) ดูรายละเอียดข้อ 1 ใน `docs/CORE_ABI.md`
+- `CAtaSmart::Init(BOOL useWmi, BOOL advancedDiskSearch, PBOOL flagChangeDisk, BOOL workaroundHD204UI, BOOL workaroundAdataSsd, BOOL flagHideNoSmartDisk, BOOL flagSortDriveLetter, BOOL flagHideRAIDVolume)` ผลอยู่ใน `CArray<ATA_SMART_INFO> vars` (`AtaSmart.h:1768,1942`)
+- agy รัน headless สั่ง shell ไม่ได้ → agy แก้ไฟล์อย่างเดียว Coding Owner เป็นคน build/ทดสอบแล้วส่ง error กลับ
 
 ## Open questions / known risks
 - `CAtaSmart` อาจเริ่ม COM/WMI ภายใน — ต้องเช็คว่าเรียกจากเธรดที่ C# สร้างได้ปลอดภัย (ข้อ 1 ใน CORE_ABI "ต้องยืนยัน")
