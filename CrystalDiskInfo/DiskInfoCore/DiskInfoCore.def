@@ -1,0 +1,8 @@
+LIBRARY DiskInfoCore
+EXPORTS
+    di_abi_version
+    di_open
+    di_close
+    di_scan
+    di_disk_count
+    di_disk_info
