@@ -7,7 +7,7 @@ Requirement: R-003 (🔨) ผ่านการต่อ R-019 ใน `D:\Dev\Ap
 
 > **อัปเดต 2026-10-11:** ตรวจพบว่าสาเหตุอุณหภูมิ n/a คือ property ID ผิดใน SystemMonitor (ดู `phase2a-sysmon-temp-id.md`) ลำดับที่เสนอใหม่: 2a ก่อน แล้วเฟส 1 นี้ยังจำเป็นสำหรับ USB HDD (R-003 ส่วนที่เหลือ) และ R-002/R-001 — รอผู้ใช้รับรองลำดับ
 
-> **สถานะ 2026-10-12 — ข้อยกเว้นของ workflow:** agy ติดโควตา (429, รีเซ็ตอีก ~42 ชม., ลองทั้ง Gemini 3.8 Flash Medium และ 3.1 Pro High ได้ผลเดียวกัน) ผู้ใช้อนุมัติให้ Coding Owner เขียนเฟสนี้เอง (ทางเลือก 3) ไฟล์ใหม่ใน `CrystalDiskInfo/DiskInfoCore/` เขียนโดย Claude Code ไม่ใช่ agy; Reviewer2 (Codex) ตรวจแล้วไม่พบ defect, Reviewer1 (Opus) กำลังตรวจ ผล build/ทดสอบอยู่ใน `docs/TESTING.md` และ `docs/CORE_ABI.md` ข้อ 1b–6
+> **สถานะ 2026-10-12 — ข้อยกเว้นของ workflow:** agy ติดโควตา (429, รีเซ็ตอีก ~42 ชม., ลองทั้ง Gemini 3.8 Flash Medium และ 3.1 Pro High ได้ผลเดียวกัน) ผู้ใช้อนุมัติให้ Coding Owner เขียนเฟสนี้เอง (ทางเลือก 3) ไฟล์ใหม่ใน `DiskInfoCore/` เขียนโดย Claude Code ไม่ใช่ agy; Reviewer2 (Codex) ตรวจแล้วไม่พบ defect, Reviewer1 (Opus) กำลังตรวจ ผล build/ทดสอบอยู่ใน `docs/TESTING.md` และ `docs/CORE_ABI.md` ข้อ 1b–6
 
 ## Objective
 สร้าง Windows DLL (`DiskInfoCore.dll`, x64) ที่ห่อ `CAtaSmart` เดิม และเปิดฟังก์ชันตามสัญญา `docs/CORE_ABI.md` ให้ C# เรียกผ่าน P/Invoke ได้ ในเฟสนี้ทำเฉพาะ `di_abi_version`, `di_open`, `di_close`, `di_scan`, `di_disk_count`, `di_disk_info` (ยังไม่ต้องทำ `di_attr_*`)
@@ -21,7 +21,7 @@ Requirement: R-003 (🔨) ผ่านการต่อ R-019 ใน `D:\Dev\Ap
 - [ ] `DiskInfo.sln` เดิม build ไม่พัง (ไม่แก้พฤติกรรม GUI)
 
 ## Scope (อนุญาตให้แก้/เพิ่ม)
-- เพิ่มโปรเจกต์ใหม่ `CrystalDiskInfo/DiskInfoCore/` (vcxproj + `core_api.cpp` + `core_api.h`) และเพิ่มเข้า `DiskInfo.sln` เฉพาะถ้า build ไม่กระทบ config เดิม
+- เพิ่มโปรเจกต์ใหม่ `DiskInfoCore/` (vcxproj + `core_api.cpp` + `core_api.h`) และเพิ่มเข้า `DiskInfo.sln` เฉพาะถ้า build ไม่กระทบ config เดิม
 - `docs/CORE_ABI.md` (เติมผลที่ยืนยัน) และ `docs/TESTING.md` (คำสั่ง build/test ใหม่)
 - ห้ามแก้ `AtaSmart.cpp/.h` เว้นแต่จำเป็นจริงและบอกเหตุผล
 

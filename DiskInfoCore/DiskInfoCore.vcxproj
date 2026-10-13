@@ -34,7 +34,7 @@
     <OutDir>$(MSBuildProjectDirectory)\Build\$(Configuration)$(Platform)\</OutDir>
     <IntDir>$(MSBuildProjectDirectory)\Build\obj\$(Configuration)$(Platform)\</IntDir>
     <TargetName>DiskInfoCore</TargetName>
-    <IncludePath>$(MSBuildProjectDirectory)\..;$(MSBuildProjectDirectory)\..\Library;$(MSBuildProjectDirectory)\..\Priscilla;$(IncludePath)</IncludePath>
+    <IncludePath>$(MSBuildProjectDirectory)\..\CrystalDiskInfo;$(MSBuildProjectDirectory)\..\CrystalDiskInfo\Library;$(MSBuildProjectDirectory)\..\CrystalDiskInfo\Priscilla;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -77,14 +77,14 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Existing CrystalDiskInfo sources AtaSmart.cpp links against; not modified. -->
-    <ClCompile Include="..\AtaSmart.cpp" />
-    <ClCompile Include="..\NVMeInterpreter.cpp" />
-    <ClCompile Include="..\SlotSpeedGetter.cpp" />
-    <ClCompile Include="..\Priscilla\UtilityFx.cpp">
+    <ClCompile Include="..\CrystalDiskInfo\AtaSmart.cpp" />
+    <ClCompile Include="..\CrystalDiskInfo\NVMeInterpreter.cpp" />
+    <ClCompile Include="..\CrystalDiskInfo\SlotSpeedGetter.cpp" />
+    <ClCompile Include="..\CrystalDiskInfo\Priscilla\UtilityFx.cpp">
       <!-- Frees the name DebugPrint for the no-op in core_api.cpp (see the comment there). -->
       <PreprocessorDefinitions>DebugPrint=CdiOriginalDebugPrint;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
-    <ClCompile Include="..\Priscilla\OsInfoFx.cpp" />
+    <ClCompile Include="..\CrystalDiskInfo\Priscilla\OsInfoFx.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
