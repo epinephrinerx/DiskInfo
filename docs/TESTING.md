@@ -51,11 +51,11 @@ $k='C:\Program Files (x86)\Windows Kits\10'; $v='10.0.26100.0'
 
 | Level | Purpose | Location | Command |
 |---|---|---|---|
-| Unit | business logic แบบ isolated | `[PATH]` | `[COMMAND]` |
-| Integration | database, filesystem หรือ adapter contracts | `[PATH]` | `[COMMAND]` |
-| Contract/API | request/response และ compatibility | `[PATH]` | `[COMMAND]` |
-| End-to-end | critical user journeys | `[PATH]` | `[COMMAND]` |
-| Smoke | ตรวจระบบหลัง build/deploy | `[PATH]` | `[COMMAND]` |
+| Unit | logic ฝั่งผู้ใช้ DLL (แปลง sentinel, state, หน้าจอ) | `D:DevAppsSystemMonitor4.0SysMonitor.Tests` (MSTest, ไม่ใช่ใน repo นี้) | `dotnet test SysMonitor.Tests` |
+| Integration | DLL จริง: โหลด, สแกน, struct layout | ยังไม่มี test อัตโนมัติใน repo นี้; ตรวจ struct (160 B, `power_on_hours` ที่ 144) ใน `SmartFallbackTests` ของ SystemMonitor และเรียก P/Invoke ด้วยสคริปต์ครั้งเดียว | ดูหัวข้อ 8 |
+| Contract/API | ABI ตาม `docs/CORE_ABI.md` | `SysMonitor.Tests/SmartModuleTests.cs` ตรวจ search path ของ P/Invoke และการแปลงฟิลด์ native | `dotnet test SysMonitor.Tests` |
+| End-to-end | แอปจริงแบบ admin เห็นข้อมูลดิสก์ | ยังไม่มี test อัตโนมัติ; ตรวจด้วยมือและภาพหน้าจอ (หัวข้อ 8) | ดูหัวข้อ 8 |
+| Smoke | ตรวจหลัง build | `build-wpf.cmd` (รัน test ก่อน แล้ว publish และสร้าง installer ที่รวม DLL) | `build-wpf.cmd` ใน `SystemMonitor4.0` |
 
 ## 3. เลือกชุดตรวจสอบตามการเปลี่ยนแปลง
 
@@ -85,15 +85,15 @@ $k='C:\Program Files (x86)\Windows Kits\10'; $v='10.0.26100.0'
 
 - ใช้ synthetic data; ห้ามใช้ข้อมูลลูกค้าจริง
 - แต่ละ test ต้องสร้างและล้างข้อมูลของตนเอง
-- Local test database: `[STRATEGY]`
-- Fixture factories: `[PATH]`
-- Reset command: `[COMMAND]`
+- Local test database: N/A (ไม่มี database)
+- Fixture factories: ฝั่ง SystemMonitor สร้าง `Snapshot`/`SmartDisk` สังเคราะห์ใน `SmartModuleTests.cs`; ฝั่ง DiskInfo ยังไม่มี
+- Reset command: N/A (test ไม่เขียนข้อมูลถาวร; test ที่รัน `Sampler` จริงอ่านเครื่องแบบอ่านอย่างเดียว)
 - Tests ที่ destructive ต้องทำงานเฉพาะใน disposable environment และมี guard ป้องกัน production
 
 ## 6. Coverage policy
 
 - Coverage เป็นสัญญาณ ไม่ใช่เป้าหมายเพียงอย่างเดียว
-- Minimum project threshold: `[PERCENT_OR_N/A]`
+- Minimum project threshold: ไม่กำหนด (โครงการไม่วัด coverage)
 - โค้ดใหม่/เปลี่ยนต้องครอบคลุม decision paths ที่มีความเสี่ยง
 - ห้ามเพิ่ม meaningless assertions เพื่อให้ตัวเลขผ่าน
 - รายงานส่วนที่ไม่ทดสอบพร้อมเหตุผลและ risk mitigation
@@ -109,7 +109,7 @@ Pull request ต้องผ่าน:
 5. Build/package validation
 6. Security/license checks ตามที่โครงการกำหนด
 
-CI configuration: `[PATH_OR_URL]`
+CI configuration: ไม่มี (ทั้งสอง repo ไม่มี `.github`; gate คือ `build-wpf.cmd` ที่เจ้าของรันเอง)
 
 Flaky test ห้าม rerun จนเขียวแล้วละเลย ให้เก็บหลักฐาน เปิด issue และ quarantine เฉพาะเมื่อมีเจ้าของกับวันติดตามชัดเจน
 
@@ -125,8 +125,10 @@ Flaky test ห้าม rerun จนเขียวแล้วละเลย �
 
 Critical smoke checklist:
 
-- `[USER_JOURNEY_1]`
-- `[USER_JOURNEY_2]`
+- เปิด SystemMonitor แบบผู้ดูแลระบบ (ปุ่ม "รันใหม่แบบผู้ดูแลระบบ" ในหน้าตั้งค่า) → ติ๊ก "แสดง SMART ของดิสก์" → เห็นแท็บ/section/หน้า Widget ของทุกดิสก์พร้อมข้อมูลจริง
+- เปิดแบบปกติ (ไม่ใช่ admin) → โมดูลบอกว่าต้องใช้ผู้ดูแลระบบ และอุณหภูมิ SATA/NVMe ในเครื่องยังขึ้นจาก storage query
+- วิธีตรวจแบบ admin ที่ใช้แล้ว (2026-10-13): สคริปต์ PowerShell ยกระดับครั้งเดียว (ผู้ใช้กด UAC) สำรองและคืน `config.wpf.json` เอง เปิดแอปด้วย `--allow-multiple --full`/`--expanded` (ไม่ชนสำเนาที่ผู้ใช้เปิดอยู่) แล้วจับภาพหน้าต่างด้วย `CopyFromScreen` (โปรเซสที่ยกระดับรับ input จากเชลล์ปกติไม่ได้ จึงควบคุมด้วย argument และ config เท่านั้น) สคริปต์ไม่อยู่ใน repo
+- ต้องวาง `DiskInfoCore.dll` ข้าง `SystemMonitor.exe` (ตอน build ด้วย `build-wpf.cmd` ตัว setup รวมไว้ให้; รันจาก `binDebug` ต้องคัดลอกเอง)
 - Error handling และ recovery ที่สำคัญ
 
 ## 9. Failure handling
@@ -143,10 +145,10 @@ Critical smoke checklist:
 
 ## 10. Performance and security testing
 
-- Performance command/scenario: `[COMMAND_OR_PLAN]`
-- Baseline และ regression threshold: `[TARGET]`
-- Security scanning: `[COMMAND/CI_JOB]`
-- Dependency audit: `[COMMAND]`
+- Performance command/scenario: ยังไม่มี (วัดเวลาสแกนด้วยมือ 3.1–4.3 วินาที)
+- Baseline และ regression threshold: ยังไม่กำหนด
+- Security scanning: ยังไม่มี (DLL อ่านอย่างเดียว; การยกระดับสิทธิ์ทำโดยผู้ใช้กดเองเท่านั้น)
+- Dependency audit: N/A (SystemMonitor ห้ามใช้ package ของบุคคลที่สาม; DLL ลิงก์ MFC แบบ static ไม่มี package)
 - ห้ามยิง load test หรือ security test ไป production โดยไม่ได้รับอนุญาต
 
 ## 11. Release verification

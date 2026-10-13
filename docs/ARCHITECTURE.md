@@ -2,153 +2,136 @@
 
 เอกสารนี้อธิบายโครงสร้างและขอบเขตของ `DiskInfo` ให้อัปเดตเมื่อมีการเปลี่ยน service boundary, data flow, storage, public API หรือ dependency direction
 
+สถานะ (2026-10-13): บันทึกเฉพาะสิ่งที่มีอยู่และยืนยันแล้ว **ทิศทาง "แยก Core ออก แล้วเพิ่มความสามารถเป็น plug-in/extension/DLL ทั้ง SystemMonitor และ DiskInfo" (R-004) ยังเป็น 🕐 รอยืนยัน — ยังไม่อยู่ในเอกสารนี้** เมื่อรับรองแล้วจะเขียนเป็น ADR ใน `docs/adr/` แล้วค่อยปรับหัวข้อ 4–5 และ 8
+
 ## 1. System overview
 
-`[อธิบายระบบ ผู้ใช้หลัก และคุณค่าที่ระบบมอบให้ภายใน 3-5 ประโยค]`
+DiskInfo คือ fork ของ CrystalDiskInfo (GUI แบบ MFC บน Windows) ที่เก็บซอร์สต้นฉบับไว้ใน `CrystalDiskInfo/` โดยไม่แก้ และเพิ่ม `DiskInfoCore/` ซึ่งเป็น native DLL ที่ห่อ `CAtaSmart` ของ Crystal ด้วย C ABI เพื่อให้แอปอื่น (ตอนนี้คือ SystemMonitor แบบ WPF ผ่าน P/Invoke) อ่านสุขภาพ อุณหภูมิ อายุ และชั่วโมงใช้งานของดิสก์ได้โดยไม่ต้องมี GUI ของ Crystal ผู้ใช้หลักคือเจ้าของโครงการเอง ส่วน core อ่าน SMART ต้องรันแบบผู้ดูแลระบบ (ถ้าไม่ใช่ จะคืน `DI_E_ACCESS` และไม่พบดิสก์เลย)
 
 ### Goals
 
-- `[GOAL_1]`
-- `[GOAL_2]`
+- ให้ SystemMonitor แสดงอุณหภูมิและ SMART ของดิสก์จริงผ่านตัวอ่านเดียวกับ Crystal (R-002, R-003)
+- มี C ABI ที่นิ่ง (`docs/CORE_ABI.md`) ให้ผู้ใช้หลายโครงการใช้ร่วมกัน
+- (ชะลอ) core แบบ portable C++17 + CMake + CLI บน Ubuntu 21.04+/Debian 11+ แบบ compile+link เท่านั้น (R-001, ผู้ใช้สั่งชะลอ 2026-10-13)
 
 ### Non-goals
 
-- `[NON_GOAL_1]`
-- `[NON_GOAL_2]`
+- ไม่แก้ GUI MFC เดิมของ CrystalDiskInfo และไม่เปลี่ยนพฤติกรรมของ `DiskInfo.sln`
+- ไม่ทำฟีเจอร์ Crystal ที่ SystemMonitor ไม่มีในข้อกำหนด เช่น แจ้งเตือนอีเมล กราฟประวัติ SMART AAM/APM skin
+- ไม่อ่านดิสก์จริงบน Linux และไม่ทำ .deb (R-001)
 
 ## 2. Context diagram
 
 ```text
-[User/Client]
-      |
-      v
-[UI/API Entry Point] ---> [External Service]
-      |
-      v
-[Application/Core]
-      |
-      v
-[Database/Storage]
+[SystemMonitor.exe (WPF, repo SystemMonitor4.0)]          [DiskInfo64.exe (MFC เดิม)]
+      |  P/Invoke: di_open / di_scan / di_disk_info              |
+      v  (C ABI v1, docs/CORE_ABI.md)                            |
+[DiskInfoCore.dll]  --- compile จากซอร์สเดียวกัน ---> [CrystalDiskInfo/AtaSmart.cpp (CAtaSmart)]
+      |                                                          |
+      v   IOCTL อ่านอย่างเดียว + WMI (root\cimv2, root\WMI)      v
+[Windows storage stack / ตัวควบคุม NVMe-SATA-USB bridge] --> [ดิสก์จริง]
 ```
 
-แทน diagram นี้ด้วยองค์ประกอบจริง ระบุ trust boundary และ network boundary ที่สำคัญ
+- trust boundary: การอ่าน SMART ต้องใช้สิทธิ์ผู้ดูแลระบบ ฝั่ง SystemMonitor ไม่ยกระดับสิทธิ์เอง ผู้ใช้กดปุ่มเอง
+- ไม่มี network boundary: ไม่มีการเรียกเครือข่าย (SystemMonitor มีตัวตรวจอัปเดตแยกต่างหาก ไม่เกี่ยวกับ DLL นี้)
 
 ## 3. Repository map
 
 ```text
 /
-├── src/                 # application source
-│   ├── presentation/    # UI, HTTP, CLI หรือ transport adapters
-│   ├── application/     # use cases และ orchestration
-│   ├── domain/          # business rules และ domain types
-│   └── infrastructure/  # database, network, filesystem adapters
-├── tests/               # automated tests
-├── docs/                # project documentation
-├── scripts/             # repeatable local/CI utilities
-└── [config files]
+├── CrystalDiskInfo/     # ซอร์ส Crystal ต้นฉบับ (baseline cbe5ac2) ห้ามแก้
+├── DiskInfoCore/        # DiskInfoCore.dll: core_api.h/.cpp, .def, .vcxproj (Build/ ถูก git ignore)
+├── docs/                # AI_WORKFLOW, ARCHITECTURE, TESTING, CORE_ABI, handoff/
+├── Requirements.md      # ข้อตกลง R-001..R-004 (หลักของ R-002 อยู่ที่นี่)
+├── CLAUDE.md / AGENTS.md
 ```
 
-ปรับโครงสร้างให้ตรงกับ repository จริง และลบ directory ที่ไม่มีอยู่
+ฝั่งผู้ใช้ DLL อยู่นอก repo นี้: `D:\Dev\Apps\SystemMonitor4.0` (`Native/SmartCore.cs` และ `Sensors/SmartBoard.cs`)
 
 ## 4. Components and ownership
 
 | Component | Responsibility | Public interface | Owner |
 |---|---|---|---|
-| `[COMPONENT]` | `[หน้าที่]` | `[API/event/function]` | `[TEAM]` |
-| `[COMPONENT]` | `[หน้าที่]` | `[API/event/function]` | `[TEAM]` |
+| `CrystalDiskInfo/` | GUI และตัวอ่าน SMART เดิม (`CAtaSmart`) | ไม่มี (ใช้ภายใน) | Apichart Chantanis |
+| `DiskInfoCore/` | ห่อ `CAtaSmart` เป็น C ABI: ตั้งค่า threshold/flag เหมือน GUI, แปลงค่า "ไม่มี" เป็น sentinel, serialize การสแกน | 6 export: `di_abi_version`, `di_open`, `di_close`, `di_scan`, `di_disk_count`, `di_disk_info` | Apichart Chantanis |
+| `SystemMonitor4.0` (repo อื่น) | ตัวใช้ DLL: P/Invoke, thread สแกนแยก, แสดงผล | `Native/SmartCore.cs` | Apichart Chantanis |
 
 ## 5. Dependency rules
 
-- Presentation เรียก application layer; ไม่เข้าถึง storage โดยตรง
-- Application orchestrates use cases; business rules สำคัญอยู่ใน domain
-- Domain ไม่ import framework, database client หรือ network client
-- Infrastructure implement interfaces ที่ชั้นในกำหนด
-- Shared utilities ต้องไม่มี business ownership ที่คลุมเครือ
-- ห้ามสร้าง circular dependency
-
-หาก architecture จริงไม่ใช่ layered architecture ให้แทนกฎด้านบนด้วย dependency rules ที่ใช้จริง
+- `CrystalDiskInfo/` ไม่ถูกแก้ และไม่รู้จัก `DiskInfoCore/`; `DiskInfoCore.vcxproj` อ้างซอร์สเดิมผ่าน `..\CrystalDiskInfo\...`
+- ผู้ใช้ DLL คุยผ่าน C ABI เท่านั้น ห้ามอ้าง header C++ ของ Crystal; header ของ ABI (`core_api.h`) เป็น C ล้วน
+- ABI ไม่เปลี่ยนแบบแตกหัก: struct ขึ้นต้น `struct_size`, เพิ่มฟิลด์ท้าย struct ได้ (ผู้เรียกที่ส่งขนาด ≥ v1 ใช้ได้), เลข major เปลี่ยนเมื่อแตกหัก
+- DLL ไม่เขียนดิสก์ ทุก IOCTL อ่านอย่างเดียว และไม่ลบไฟล์ข้าง host (แทน `DebugPrint` เดิมด้วย no-op)
+- การสแกนทั้ง process ต้องทีละครั้ง และต้องเรียกจาก thread พื้นหลัง (ใช้เวลาหลายวินาที และเรียก COM)
+- ห้ามมี circular dependency ระหว่าง repo: SystemMonitor พึ่ง DiskInfo ไม่ใช่ทางกลับ
 
 ## 6. Runtime data flow
 
-### `[FLOW_NAME เช่น Create order]`
+### สแกน SMART จาก SystemMonitor
 
-1. `[Actor]` ส่ง `[request/event]`
-2. `[Entry component]` ตรวจ syntax และ authentication
-3. `[Use case]` ตรวจ business rules
-4. `[Repository/service]` อ่านหรือบันทึกข้อมูล
-5. ระบบตอบ `[response/event]`
+1. thread `smart-scan` (STA) เรียก `di_open` → `di_scan`
+2. `di_scan` เปิดแฟล็ก USB/RAID/CSMI เหมือน GUI, ตั้ง caution threshold 1/1/1/10 แล้ว `CAtaSmart::Init` และ `CheckDiskStatus` ทุกดิสก์
+3. SystemMonitor อ่านทีละดิสก์ด้วย `di_disk_info` แล้วแปล sentinel (`DI_NA`, `DI_NA64`) เป็น "ไม่มีค่า"
+4. ผลทั้งชุดและสถานะถูกเขียนเป็นค่าเดียว แล้ว UI อ่านจาก snapshot
 
 Failure behavior:
 
-- Validation failure → `[status/error type]`
-- Authentication/authorization failure → `[behavior]`
-- Dependency timeout → `[retry/fallback behavior]`
-- Partial failure → `[transaction/compensation behavior]`
+- ไม่ใช่ admin → `di_scan` คืน `DI_E_ACCESS` (-2) และไม่พบดิสก์ → SystemMonitor แสดง "ต้องรันแบบผู้ดูแลระบบ"
+- ไม่มี DLL หรือ ABI major ไม่ตรง → โมดูลบอกว่า "ไม่พบ DiskInfoCore.dll" แอปทำงานต่อ
+- สแกนล้ม → ทิ้งผลเก่าทั้งหมด ไม่แสดงดิสก์ค้าง
+- ดิสก์ที่อ่านข้อมูลไม่ครบ → `access = PARTIAL` และตัวเลขที่ไม่มีเป็น sentinel
 
 ## 7. Data model and storage
 
-| Entity/table | Purpose | Owner | Retention/notes |
-|---|---|---|---|
-| `[NAME]` | `[PURPOSE]` | `[COMPONENT]` | `[RETENTION]` |
-
-- Source of truth: `[SYSTEM]`
-- Identifier strategy: `[UUID/sequence/etc.]`
-- Transaction boundary: `[DESCRIPTION]`
-- Migration tool/process: `[COMMAND_OR_DOC]`
-- Backup/restore expectation: `[DESCRIPTION]`
-
-Schema changes ต้องมี migration, rollback/forward-fix plan และ compatibility strategy เมื่อมีหลาย application version ทำงานพร้อมกัน
+ไม่มี database หรือไฟล์ที่ DLL เก็บเอง โครงสร้างที่ข้าม ABI คือ `di_disk_info_t` (160 ไบต์ v1; `power_on_hours` ที่ offset 144) ดูฟิลด์และ sentinel ใน `docs/CORE_ABI.md` ค่าตั้งของ SystemMonitor (`config.wpf.json`) เป็นของ repo นั้น
 
 ## 8. Interfaces
 
 ### Public API
 
-- Contract location: `[OpenAPI/GraphQL/protobuf/path]`
-- Versioning policy: `[POLICY]`
-- Compatibility policy: `[POLICY]`
+- Contract location: `docs/CORE_ABI.md` และ `DiskInfoCore/core_api.h`
+- Versioning policy: `di_abi_version()` คืน `major<<16 | minor` (ตอนนี้ 1.0) ผู้ใช้ตรวจเฉพาะ major
+- Compatibility policy: เพิ่มฟิลด์ท้าย struct ได้ใน minor; แตกหัก = เพิ่ม major
 
 ### Events and jobs
 
-| Name | Producer | Consumer | Delivery/idempotency |
-|---|---|---|---|
-| `[EVENT]` | `[SERVICE]` | `[SERVICE]` | `[POLICY]` |
+ไม่มี
 
 ### External dependencies
 
 | Dependency | Purpose | Timeout/retry | Failure impact |
 |---|---|---|---|
-| `[SERVICE]` | `[PURPOSE]` | `[POLICY]` | `[IMPACT]` |
+| Windows storage IOCTL | อ่าน SMART/NVMe log | ไม่มี timeout เอง (สแกนวัดได้ 3.1–4.3 วินาที กับ 2–4 ดิสก์) | ดิสก์นั้นไม่มีค่า |
+| WMI (`root\cimv2`, `root\WMI`) | ค้นหาดิสก์ | ไม่มี retry | ไม่พบดิสก์บางตัว |
 
 ## 9. Cross-cutting concerns
 
-- Authentication: `[METHOD]`
-- Authorization: `[POLICY AND ENFORCEMENT POINT]`
-- Configuration: `[ENV/CONFIG STRATEGY]`
-- Secrets: `[SECRET MANAGER; ห้ามใส่ค่าจริง]`
-- Logging: `[STRUCTURE AND REDACTION RULES]`
-- Metrics/tracing: `[TOOLS AND REQUIRED SIGNALS]`
-- Caching: `[OWNER, TTL, INVALIDATION]`
-- Rate limiting: `[BOUNDARY AND POLICY]`
-- Localization/timezone: `[POLICY]`
+- Authentication/Authorization: ต้องเป็นผู้ดูแลระบบ จุดบังคับคือ Windows (IOCTL ถูกปฏิเสธ) ไม่มี authz ของโครงการเอง
+- Configuration: DLL ไม่มีไฟล์ตั้งค่า มีแค่แฟล็ก `di_open` (`DI_OPEN_NO_WMI`)
+- Secrets: ไม่มี
+- Logging: DLL ไม่เขียน log ไม่สร้างหรือลบไฟล์ข้าง host
+- Localization: ข้อความเป็น UTF-8 ใน buffer ตายตัว DLL ไม่มีสตริงสำหรับผู้ใช้ การแปลอยู่ฝั่งผู้ใช้ DLL
 
 ## 10. Quality attributes
 
 | Attribute | Target | How verified |
 |---|---|---|
-| Availability | `[TARGET]` | `[METHOD]` |
-| Latency | `[P95/P99]` | `[METHOD]` |
-| Throughput | `[TARGET]` | `[METHOD]` |
-| Data integrity | `[GUARANTEE]` | `[METHOD]` |
-| Security/privacy | `[STANDARD]` | `[METHOD]` |
+| Latency | ยังไม่กำหนดเป้าหมาย (วัดได้ 3.1–4.3 วินาทีต่อการสแกนกับ 2–4 ดิสก์) | วัดด้วย P/Invoke จริง 2026-10-12 |
+| Data integrity | ไม่เขียนดิสก์ ไม่แสดงค่าประมาณ | ตรวจโค้ด + review (Codex/Opus) |
+| Availability, Throughput, Security/privacy | ยังไม่กำหนด | — |
 
 ## 11. Architecture decisions
 
-การตัดสินใจที่มีผลระยะยาวให้สร้าง ADR ใน `docs/adr/NNNN-title.md` โดยมี Context, Decision, Alternatives, Consequences และ Status
-
 | ADR | Decision | Status |
 |---|---|---|
-| `[0001-title]` | `[SUMMARY]` | `[Proposed/Accepted/Superseded]` |
+| (ยังไม่มีไฟล์ใน `docs/adr/`) | ตัดสินใจมาแล้วแต่บันทึกไว้ใน `CORE_ABI.md` และ `Requirements.md`: ห่อ `CAtaSmart` ด้วย C ABI แทนการเขียนตัวอ่านใหม่ · ใช้ native DLL กับ SystemMonitor (ผู้ใช้ยอมรับ 2026-10-09) | Accepted |
+| (ถัดไป) | plug-in/extension architecture ของ SystemMonitor และ DiskInfo (R-004) | Proposed — รอผู้ใช้ยืนยัน |
 
 ## 12. Known constraints and technical debt
 
-- `[CONSTRAINT_OR_DEBT พร้อมผลกระทบและ issue link]`
+- `CAtaSmart` ผูกกับ MFC/ATL (`AtaSmart.cpp` 13,570 บรรทัด ใช้ `CString` 127 จุดและ `DeviceIoControl` 65 จุด) DLL จึงลิงก์ MFC แบบ static (582,656 B) และการ port ไป Linux (R-001) ต้องแยกส่วนก่อน
+- `DiskInfoCore.vcxproj` ตั้ง toolset v142 ต้อง override เป็น v145 ที่บรรทัดคำสั่ง
+- ถ้า registry `KitsRoot10` ชี้ผิด build ล้มที่ `new.h` ดูวิธีเลี่ยงใน `docs/TESTING.md`
+- `DiskInfo.vcxproj` เดิมเขียน PDB ใต้ซอร์ส (`CrystalDiskInfo\Build\`) ต้องลบก่อน commit
+- ยังไม่ได้ build ผ่าน `DiskInfo.sln` ทั้งชุด และยังไม่มี test อัตโนมัติของ DLL เอง (ทดสอบผ่าน test ของ SystemMonitor และสคริปต์ P/Invoke)
+- ยังไม่ได้ทดสอบ: กรณี NVMe อ่านล้มเหลว (ต้องไม่รายงาน `access = FULL`, ข้อ F4 ใน `CORE_ABI.md`) และทางที่ `CoInitializeEx` คืน `RPC_E_CHANGED_MODE`
