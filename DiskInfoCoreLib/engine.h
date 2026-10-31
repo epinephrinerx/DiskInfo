@@ -43,4 +43,9 @@ namespace dicore
 	// Requires a usable dicore::ComScope alive on the calling thread for the lifetime of the CAtaSmart object.
 	// CException* and other exceptions propagate; callers catch them at their ABI boundary.
 	void Scan(CAtaSmart& ata, bool useWmi);
+
+	// Computes attribute health status: 0 unknown, 1 good, 2 caution, 3 bad.
+	// Callers must run dicore::Scan first (it sets AlarmTemperature and the caution thresholds).
+	// Literal port of CDiskInfoDlg::UpdateListCtrl icon decision (DiskInfoDlgUpdate.cpp:325-726).
+	int AttributeStatus(const CAtaSmart& ata, int disk, int attr);
 }

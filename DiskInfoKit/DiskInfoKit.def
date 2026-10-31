@@ -1,0 +1,9 @@
+LIBRARY DiskInfoKit
+EXPORTS
+	dik_api_version
+	dik_open
+	dik_close
+	dik_scan
+	dik_disk_count
+	dik_disk
+	dik_attribute

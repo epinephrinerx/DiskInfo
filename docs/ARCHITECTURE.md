@@ -42,6 +42,7 @@ DiskInfo คือ fork ของ CrystalDiskInfo (GUI แบบ MFC บน Wind
 ├── CrystalDiskInfo/     # ซอร์ส Crystal ต้นฉบับ (baseline cbe5ac2) ห้ามแก้
 ├── DiskInfoCoreLib/     # core กลาง (static lib, Win32+x64): engine.h/.cpp + คอมไพล์ซอร์ส Crystal (R-016 เฟส 1)
 ├── DiskInfoCore/        # DiskInfoCore.dll (ABI v1 ของ SystemMonitor): core_api.h/.cpp, .def, .vcxproj ลิงก์ DiskInfoCoreLib
+├── DiskInfoKit/         # DiskInfoKit.dll (API ใหม่ 1.0, Win32+x64): include/diskinfokit.h (C99), kit_api.cpp, .def ลิงก์ DiskInfoCoreLib (R-016 เฟส 2)
 ├── docs/                # AI_WORKFLOW, ARCHITECTURE, TESTING, CORE_ABI, handoff/
 ├── Requirements.md      # ข้อตกลง R-001..R-004 (หลักของ R-002 อยู่ที่นี่)
 ├── CLAUDE.md / AGENTS.md
@@ -54,14 +55,16 @@ DiskInfo คือ fork ของ CrystalDiskInfo (GUI แบบ MFC บน Wind
 | Component | Responsibility | Public interface | Owner |
 |---|---|---|---|
 | `CrystalDiskInfo/` | GUI และตัวอ่าน SMART เดิม (`CAtaSmart`) | ไม่มี (ใช้ภายใน) | Apichart Chantanis |
-| `DiskInfoCoreLib/` | core กลาง: compile ซอร์ส Crystal, ตั้ง flag/threshold เหมือน GUI แล้วสแกน (`dicore::Scan`), `ComScope`, `CopyUtf8`, `IsElevated`, `DebugPrint` แบบ no-op | C++ ภายใน (`engine.h`) ไม่ใช่ ABI ที่ export | Apichart Chantanis |
+| `DiskInfoCoreLib/` | core กลาง: compile ซอร์ส Crystal, ตั้ง flag/threshold/alarm เหมือน GUI แล้วสแกน (`dicore::Scan`), สถานะรายแถวตาม GUI (`dicore::AttributeStatus`), `ComScope`, `CopyUtf8`, `IsElevated`, `DebugPrint` แบบ no-op | C++ ภายใน (`engine.h`) ไม่ใช่ ABI ที่ export | Apichart Chantanis |
 | `DiskInfoCore/` | ห่อ core กลางเป็น C ABI v1: ตั้งค่า threshold/flag เหมือน GUI, แปลงค่า "ไม่มี" เป็น sentinel, serialize การสแกน | 6 export: `di_abi_version`, `di_open`, `di_close`, `di_scan`, `di_disk_count`, `di_disk_info` | Apichart Chantanis |
+| `DiskInfoKit/` | API ใหม่ 1.0 บน core กลาง: ข้อมูลหน้าหลักแบบ CrystalDiskInfo + ตาราง SMART + สถานะรายแถว (`dicore::AttributeStatus`), snapshot หลัง scan | 7 export `dik_*` (cdecl) ตาม `include/diskinfokit.h` · `docs/DISKINFOKIT_API.md` | Apichart Chantanis |
 | `SystemMonitor4.0` (repo อื่น) | ตัวใช้ DLL: P/Invoke, thread สแกนแยก, แสดงผล | `Native/SmartCore.cs` | Apichart Chantanis |
 
 ## 5. Dependency rules
 
 - `CrystalDiskInfo/` ไม่ถูกแก้ และไม่รู้จัก `DiskInfoCoreLib/`/`DiskInfoCore/`; `DiskInfoCoreLib.vcxproj` เป็นโปรเจกต์เดียวที่ compile ซอร์สเดิมผ่าน `..\CrystalDiskInfo\...` (รวมการเปลี่ยนชื่อ `DebugPrint` ของ `UtilityFx.cpp`)
-- DLL ทุกตัว (ตอนนี้ `DiskInfoCore.dll`; เฟส 2 `DiskInfoKit.dll`) ลิงก์ `DiskInfoCoreLib` และ include เฉพาะ `engine.h` (ซึ่ง include `CompileOptions.h` ก่อน `AtaSmart.h` เพื่อให้ layout ของ `CAtaSmart` ตรงกันทุกผู้ใช้); lib ไม่มี `CWinApp` — ผู้ใช้แต่ละตัวมีของตัวเอง
+- DLL ทุกตัว (`DiskInfoCore.dll` และ `DiskInfoKit.dll`) ลิงก์ `DiskInfoCoreLib` และ include เฉพาะ `engine.h` (ซึ่ง include `CompileOptions.h` ก่อน `AtaSmart.h` เพื่อให้ layout ของ `CAtaSmart` ตรงกันทุกผู้ใช้); lib ไม่มี `CWinApp` — ผู้ใช้แต่ละตัวมีของตัวเอง
+- `DiskInfoKit/include/diskinfokit.h` เป็น C99 ล้วน (ไม่มีชนิด Win32) เพื่อให้ backend Linux/macOS (R-018) ใช้ header เดียวกัน; สัญญาอยู่ที่ `docs/DISKINFOKIT_API.md` · `.exe` ที่โหลด DLL บน Windows ต้องมี manifest ประกาศ Windows 10 ไม่งั้นดิสก์ NVMe หาย
 - ผู้ใช้ DLL คุยผ่าน C ABI เท่านั้น ห้ามอ้าง header C++ ของ Crystal; header ของ ABI (`core_api.h`) เป็น C ล้วน
 - ABI ไม่เปลี่ยนแบบแตกหัก: struct ขึ้นต้น `struct_size`, เพิ่มฟิลด์ท้าย struct ได้ (ผู้เรียกที่ส่งขนาด ≥ v1 ใช้ได้), เลข major เปลี่ยนเมื่อแตกหัก
 - DLL ไม่เขียนดิสก์ ทุก IOCTL อ่านอย่างเดียว และไม่ลบไฟล์ข้าง host (แทน `DebugPrint` เดิมด้วย no-op)
