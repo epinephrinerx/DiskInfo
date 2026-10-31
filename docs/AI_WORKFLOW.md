@@ -24,6 +24,9 @@
 - Writing Owner : agy
 - Writing Model : Gemini-3.8 Flash
 - Writing Effort : Medium
+- Writing Owner สำรอง (ใช้เมื่อ agy ติด quota ตาม §5.5 โดยไม่ต้องขออนุญาตใหม่ทุกครั้ง) : Codex
+- Writing Model สำรอง : Codex GPT-6.1-Lun (คนละผู้ให้บริการกับ Coding Owner และไม่ซ้ำกับ Reviewer1/Reviewer2 Model)
+- Writing Effort สำรอง : High
 - Reviewer1 : Claude Code
 - Reviewer1 Model : Claude Opus 5.5 ต้องไม่ซ้ำกับ Writing Model หรือ Reviewer2 Model
 - Reviewer1 Effort : High
@@ -31,7 +34,7 @@
 - Reviewer2 Model : Codex GPT-6.1-Sol ต้องไม่ซ้ำกับ Writing Model หรือ Reviewer1 Model
 - Reviewer2 Effort : High
 - Integrator : Claude Code
-- Integrator Model : Claude Opus 5.5 (ซ้ำกับ Reviewer1 — ผู้ใช้ยืนยันว่ายอมรับได้ 2026-10-31)
+- Integrator Model : Claude Fable 5.1
 - Integrator Effort : High
 
 ## 2. ลำดับความสำคัญของข้อมูล
