@@ -578,7 +578,7 @@ R-001 ยังเป็น ✅ ตกลงแล้ว แต่ยังไ�
 
 | | |
 |---|---|
-| สถานะ | ✅ ตกลงแล้ว 2026-10-31 · ยังไม่เริ่ม |
+| สถานะ | 🔨 กำลังทำ (เฟส 1 core กลาง · เริ่ม 2026-10-31 · branch `main`) |
 | วันที่ | 2026-10-31 |
 | แตะส่วนไหน | `DiskInfoCore/` (แยกส่วนห่อ `CAtaSmart` เป็น static library กลาง; DLL v1 build จากตัวกลาง) · โปรเจกต์ใหม่ `DiskInfoKit` (DLL + header) · .NET binding `DiskInfo.Kit` · `docs/CORE_ABI.md` · เอกสาร API ของ DiskInfoKit · test ใหม่ฝั่ง DiskInfo |
 | เกี่ยวกับ | [[R-017]] หน้าจอใหม่ (ผู้ใช้ API นี้) · [[R-018]] backend Linux/macOS (ใช้ header เดียวกัน) · SystemMonitor (ใช้ ABI v1 ต่อ) |
@@ -615,6 +615,11 @@ R-001 ยังเป็น ✅ ตกลงแล้ว แต่ยังไ�
 
 **คำยืนยันของคุณ (2026-10-31):**
 > รับรอง
+
+**แผนเฟส (ผู้ใช้อนุมัติ 2026-10-31: "อนุมัติแผน เริ่มเฟส 1"):** 1 core กลาง (static lib) + `DiskInfoCore.dll` ลิงก์ตัวกลาง ABI v1 ไม่เปลี่ยน · 2 `DiskInfoKit.dll` + header + เอกสาร API · 3 .NET binding `DiskInfo.Kit` + test → 🧪 · ต่อด้วย [[R-019]] TUI (เฟส 4), [[R-017]] แอป (5a/5b), [[R-018]] Linux (6) / macOS (7, รอคำตอบ) · เขียน agy (สำรอง Codex GPT-6.1-Lun) · ตรวจ Opus 5.5 + Codex GPT-6.1-Sol · ปิดเฟส Fable 5.1
+
+**เฟส 1 (2026-10-31) — โค้ดเสร็จ ยังไม่ commit · รอ probe แบบ admin:** `DiskInfoCoreLib/` (static lib Win32+x64: `engine.h/.cpp` + ซอร์ส Crystal) และ `DiskInfoCore.dll` ลิงก์ตัวกลาง; agy เขียน 1 รอบ + แก้ 2 รอบ (ตามรีวิว: layout ของ `CAtaSmart` ข้าม lib ต้องมาจาก `engine.h` ที่ include `CompileOptions.h` ก่อน `AtaSmart.h`, คืนลำดับ COM → `CAtaSmart` → `~CAtaSmart` → `CoUninitialize` ให้เหมือนเดิม, `engine.h` ใช้เดี่ยวได้, `ComScope` copy ไม่ได้, คอมเมนต์/include ค้าง); Reviewer1 Opus 5.5 และ Reviewer2 Codex GPT-6.1-Sol ผ่านรอบ 2; Integrator Fable 5.1 ผ่านทุกข้อที่ไม่ต้องใช้ admin: build Release/Debug ทั้ง x64 (DLL) และ Win32 (lib) 0 error (มีแค่ C4005 เดิม), DLL 582,656 B และ export 6 ชื่อเท่า baseline, probe สิทธิ์ปกติเท่า baseline (`abi=0x10000 scan=-2 short_struct=-6 bad_idx=-3`), `CrystalDiskInfo/`/`core_api.h`/`.def` ไม่เปลี่ยน, SystemMonitor `dotnet test` 609 ผ่าน 2 ข้าม; รายละเอียดที่ `docs/handoff/r016-phase1-core-lib.md` **probe แบบ admin (ผู้ใช้กด UAC 2026-10-31):** DLL เดิมและใหม่เห็น 3 ดิสก์เหมือนกัน (TOSHIBA SATA 37 °C · Micron 3400 NVMe 42/43 °C life 95% · Seagate USB 43 °C, health Good ทุกตัว) model/interface/health/life/hours/access/source ตรงกันทุกช่อง ต่างแค่อุณหภูมิ NVMe 1 °C (อ่านห่างกันไม่กี่วินาที) · **ยังต้องให้ผู้ใช้:** SystemMonitor แบบ admin โหลด DLL ใหม่ (ทำได้ตอนติดตั้งรุ่นถัดไป)
+
 
 ## R-017 · แอป DiskInfo หน้าจอใหม่ (Avalonia UI)
 

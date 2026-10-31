@@ -146,8 +146,7 @@
 
 ### 5.4 Git และ worktree
 
-- Branch naming: `[type]/[short-description]` เช่น `feat/user-export`
-- Agent branch: `agent/[tool]-[short-description]`
+- **DiskInfo ทำงานบน `main` เท่านั้น** (ผู้ใช้สั่ง 2026-10-31: "ไม่ทำอะไรนอก branch main ครับ") — ไม่สร้าง feature/agent branch ใหม่ commit ลง `main` โดยตรงเมื่อผู้ใช้สั่ง branch `agent/*` เดิมเก็บไว้เป็นประวัติ ไม่ลบ
 - Commit ต้องเป็นหน่วยที่ review และ revert ได้
 - ห้าม force-push, rewrite history, delete branch หรือ discard uncommitted changes โดยไม่ได้รับอนุญาต
 - ก่อน merge ให้ rebase/merge ตามนโยบายของทีมและรัน verification ใหม่

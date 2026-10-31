@@ -38,6 +38,8 @@ $k='C:\Program Files (x86)\Windows Kits\10'; $v='10.0.26100.0'
 ... "/p:UniversalCRT_IncludePath=$k\Include\$v\ucrt%3B" "/p:UniversalCRT_LibraryPath_x64=$k\lib\$v\ucrt\x64%3B"
 ```
 
+**อัปเดต 2026-10-31:** SDK บนเครื่องนี้ย้ายไปอยู่ที่ `D:\Program Files\Windows Kits\10` แล้ว (มี `Include\10.0.26100.0\ucrt\new.h`) และ registry ชี้ตรงกัน ส่วน `C:\Program Files (x86)\Windows Kits\10\Include` ไม่มีแล้ว — **ห้ามใช้วิธีเลี่ยงข้างบน** (ทำให้ล้มด้วย `new.h` เอง) ให้ build ด้วยคำสั่งปกติโดยไม่ใส่ `UniversalCRT_*` ถ้า `new.h` หายอีก ให้ตรวจ `KitsRoot10` กับโฟลเดอร์ `Include` จริงก่อน
+
 ผล (2026-10-12): Build succeeded 0 error 0 warning, `DiskInfoCore.dll` ~598 KB, export 6 ชื่อ ทดสอบเรียกจริงด้วยสคริปต์ P/Invoke (ไม่อยู่ใน repo — ยังไม่มี test อัตโนมัติ): สิทธิ์ปกติ → `di_scan` คืน `DI_E_ACCESS` (-2) และ 0 ดิสก์; admin → 3 ดิสก์ (TOSHIBA SATA, WDS NVMe, Seagate USB ผ่าน SAT) health = Good ทั้งหมด ใช้เวลา 3.1–4.3 วินาที และไฟล์ `.log` ข้าง host ไม่ถูกลบ ดูรายละเอียดและข้อสังเกตที่ `docs/CORE_ABI.md`
 
 ข้อกำหนดเบื้องต้น:
