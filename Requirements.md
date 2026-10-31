@@ -19,7 +19,7 @@
 
 | | |
 |---|---|
-| สถานะ | ✅ ตกลงแล้ว |
+| สถานะ | ⛔ ถูกแทนที่ด้วย [[R-018]] — คุณเลือก "แทนที่ R-001" 2026-10-31 เพราะเป้าหมายใหม่คือใช้งานจริงบน Linux/macOS (เกณฑ์ build บน Ubuntu/Debian ของข้อนี้ย้ายไปอยู่ใน R-018) |
 | วันที่ | 2026-10-09 |
 | แตะส่วนไหน | CrystalDiskInfo/AtaSmart.cpp · AtaSmart.h · ไฟล์ build ใหม่ (CMake) · CLI ใหม่ |
 | เกี่ยวกับ | — |
@@ -573,3 +573,166 @@ R-001 ยังเป็น ✅ ตกลงแล้ว แต่ยังไ�
 
 **ตรวจรับเมื่อ:**
 - [x] ช่อง SMART อยู่ใต้ Disk เยื้องขวา ติ๊กแล้วส่วน SMART ขึ้น (ผู้ใช้ตรวจ: "Smart ผ่าน")
+
+## R-016 · DiskInfoKit: DLL ใหม่ที่เปิดฟังก์ชันของ CrystalDiskInfo ผ่าน API ที่ออกแบบใหม่ บน core กลางร่วมกับ DiskInfoCore.dll
+
+| | |
+|---|---|
+| สถานะ | ✅ ตกลงแล้ว 2026-10-31 · ยังไม่เริ่ม |
+| วันที่ | 2026-10-31 |
+| แตะส่วนไหน | `DiskInfoCore/` (แยกส่วนห่อ `CAtaSmart` เป็น static library กลาง; DLL v1 build จากตัวกลาง) · โปรเจกต์ใหม่ `DiskInfoKit` (DLL + header) · .NET binding `DiskInfo.Kit` · `docs/CORE_ABI.md` · เอกสาร API ของ DiskInfoKit · test ใหม่ฝั่ง DiskInfo |
+| เกี่ยวกับ | [[R-017]] หน้าจอใหม่ (ผู้ใช้ API นี้) · [[R-018]] backend Linux/macOS (ใช้ header เดียวกัน) · SystemMonitor (ใช้ ABI v1 ต่อ) |
+
+**คุณระบุ:**
+> 1. ให้ใช้ Function ของ Crystal DiskInfo และ Core ของ DiskInfo มา แล้วหุ้มด้วย Interface ที่เราออกแบบใหม่ครับ
+
+**คุณตอบคำถามของผม (2026-10-31):**
+> Interface: ทั้งสองอย่าง
+> เทคโนโลยีหน้าจอ: แนะนำให้ผมด้วยครับ เพราะผมต้องการนำไปใช้กับ Linux, Mac
+> ฟังก์ชัน: ข้อมูลดิสก์ + สุขภาพ, ตาราง SMART attribute, กราฟ/ประวัติ + แจ้งเตือน, การ Scan หา Bad Sector
+
+**คุณตอบรอบสอง (2026-10-31):**
+> Avalonia UI .NET (Recommended) · Windows → Linux → macOS (Recommended) · Bad Sector: ไม่เอาในรอบนี้ · แทนที่ R-001 (Recommended)
+
+(ผมแจ้งไว้แล้วว่า CrystalDiskInfo ไม่มีฟังก์ชันสแกน bad sector — ตรวจซอร์สแล้ว — และ "Interface ทั้งสองอย่าง" แยกเป็น 3 ข้อ: API = ข้อนี้, หน้าจอ = [[R-017]], Linux/macOS = [[R-018]])
+
+**ผมเข้าใจว่า (ฉบับแก้ 2026-10-31 ตามที่คุณขอให้แยกเป็น DLL ใหม่):**
+1. แยกส่วนที่ห่อ `CAtaSmart` ของ Crystal ออกเป็น **static library กลาง (core กลาง)** ที่ใช้ร่วมกันสองตัว
+2. **`DiskInfoCore.dll`** build จาก core กลาง แต่ ABI v1 เหมือนเดิมทุกอย่าง (6 export, struct เดิม, พฤติกรรมเดิม) ใช้กับ SystemMonitor และไม่เพิ่มฟังก์ชัน
+3. **`DiskInfoKit.dll` (ใหม่)** build จาก core กลาง มี C API ของตัวเอง (เริ่มเวอร์ชัน 1.0) เปิดข้อมูลแบบหน้าหลักของ CrystalDiskInfo: รุ่น, serial, firmware, interface, โหมดรับส่ง (ปัจจุบัน/รองรับ), ความจุ, features ที่รองรับ (เช่น S.M.A.R.T., NCQ, TRIM), สุขภาพ (ระดับ + attribute ที่เป็นเหตุ), อุณหภูมิ, ชั่วโมงใช้งาน, จำนวนครั้งที่เปิดเครื่อง, host reads/writes และ NAND writes เมื่อดิสก์รายงาน
+4. **ตาราง SMART attribute** ต่อดิสก์: ATA = ID, ชื่อ, current, worst, threshold, raw; NVMe = ค่าใน SMART/Health log ในรูปรายการแบบเดียวกัน
+5. ค่าและเกณฑ์สุขภาพมาจาก logic ของ Crystal (`CAtaSmart`) ไม่เขียนการแปลผลใหม่บน Windows
+6. header ของ DiskInfoKit เป็น C ล้วน ไม่มีชนิดของ Win32 ข้อความ UTF-8 เพื่อให้ [[R-018]] build เป็น `libDiskInfoKit.so` / `.dylib` จาก header เดียวกัน (`DiskInfoCore.dll` ยังเป็น Windows อย่างเดียว)
+7. **.NET binding `DiskInfo.Kit`** (ไลบรารี managed บาง ๆ ห่อ C API) ที่หน้าจอ [[R-017]] เรียกใช้
+
+(ร่างแรกที่ให้เพิ่ม v2 เข้าไปใน `DiskInfoCore.dll` ถูกแทนด้วยฉบับนี้ ตามคำขอแก้ของคุณด้านล่าง)
+
+**คุณขอแก้ (2026-10-31):**
+> ส่วนที่ขยายออกมาจาก SystemMonitor ให้แยกเป็น dll ใหม่ครับ
+
+**คุณตอบคำถามของผม (2026-10-31):**
+> แยก core กลาง + 2 DLL · ชื่อ: DiskInfoKit
+
+**คำยืนยันของคุณ (2026-10-31):**
+> รับรอง
+
+## R-017 · แอป DiskInfo หน้าจอใหม่ (Avalonia UI)
+
+| | |
+|---|---|
+| สถานะ | ✅ ตกลงแล้ว 2026-10-31 · ยังไม่เริ่ม |
+| วันที่ | 2026-10-31 |
+| แตะส่วนไหน | โปรเจกต์ใหม่ใน repo DiskInfo (Avalonia .NET) · `docs/ARCHITECTURE.md` · `docs/TESTING.md` |
+| เกี่ยวกับ | แยกจาก [[R-016]] (คำพูดดิบอยู่ที่นั่น) · ใช้ API ของ [[R-016]] · [[R-018]] รันบน Linux/macOS |
+
+**คุณระบุ:** ดู [[R-016]] (ส่วน "หุ้มด้วย Interface ที่เราออกแบบใหม่" ฝั่งหน้าจอ + "กราฟ/ประวัติ + แจ้งเตือน" + "Avalonia UI .NET")
+
+**ผมเข้าใจว่า:**
+1. แอปใหม่ด้วย **Avalonia UI (.NET)** ใน repo DiskInfo เรียก core ผ่าน .NET binding ของ [[R-016]] ไม่ใช้โค้ดหน้าจอร่วมกับ SystemMonitor
+2. หน้าจอ: รายการดิสก์ · หน้ารายละเอียด (ข้อมูลดิสก์ + สุขภาพ แบบหน้าหลัก Crystal) · ตาราง SMART attribute
+3. **ประวัติและกราฟ:** ขณะแอปเปิด บันทึกค่าสำคัญเป็นระยะ (อุณหภูมิ, สุขภาพ, attribute ที่บอกการเสื่อม เช่น reallocated/pending sectors, life %) ลงไฟล์ในโฟลเดอร์ข้อมูลของผู้ใช้ แสดงเป็นกราฟตามเวลา
+4. **แจ้งเตือน:** เมื่อสุขภาพแย่ลง หรืออุณหภูมิเกินค่าที่ตั้ง แสดงในแอปและ notification ของระบบ
+5. ภาษาไทย/อังกฤษสลับได้ (ผมเลือกเพราะแอปอื่นของคุณทำแบบนี้)
+6. สิทธิ์: ไม่ยกระดับเองตอนเปิด ถ้าไม่ใช่ admin บอกชัดว่าต้องใช้สิทธิ์ และมีปุ่ม "รันใหม่แบบผู้ดูแลระบบ" ให้กดเอง (ผมเลือกตามแนวทางของ SystemMonitor)
+7. รอบนี้ทำบน Windows; โค้ดหน้าจอไม่ผูก Windows เพื่อให้ [[R-018]] รันบน Linux/macOS ได้
+8. เพิ่ม package Avalonia (MIT) และบันทึกเหตุผล/ความเสี่ยง/license ตาม AI_WORKFLOW §4.2
+
+**ไม่รวม:**
+- ไม่มี AAM/APM, ไม่สแกน bad sector, ไม่แจ้งเตือนทางอีเมล/เครือข่าย
+- ไม่บันทึกประวัติตอนแอปปิด (ไม่มี service/งานเบื้องหลัง)
+- ไม่ทำ skin/theme หลายแบบของ Crystal
+- ไม่ทำตัวติดตั้ง/แพ็กเกจ (เปิดเป็นข้อแยกเมื่อต้องการ)
+- ไม่แก้ GUI MFC เดิมของ CrystalDiskInfo
+
+**ตรวจรับเมื่อ:**
+- [ ] build และ test ผ่านบน Windows (`dotnet build` / `dotnet test`)
+- [ ] เปิดแบบ admin บนเครื่องนี้: เห็นดิสก์ทุกตัว ข้อมูลและตาราง attribute ตรงกับ API ของ [[R-016]]
+- [ ] กราฟแสดงค่าที่บันทึกตามเวลา ปิดแล้วเปิดใหม่ประวัติยังอยู่
+- [ ] ตั้งเกณฑ์อุณหภูมิต่ำกว่าค่าปัจจุบัน → แจ้งเตือนในแอปและ notification ของ Windows
+- [ ] สลับไทย/อังกฤษแล้วข้อความเปลี่ยนครบ
+- [ ] เปิดแบบไม่ใช่ admin: บอกว่าต้องใช้สิทธิ์ ไม่ crash ปุ่มรันใหม่ขึ้น UAC
+- [ ] `docs/ARCHITECTURE.md` บันทึกโครงสร้างใหม่ และเหตุผล/license ของ Avalonia
+
+**คำยืนยันของคุณ (2026-10-31):**
+> รับรอง
+
+## R-018 · core อ่านดิสก์จริงบน Linux และ macOS (แทน R-001)
+
+| | |
+|---|---|
+| สถานะ | ✅ ตกลงแล้ว 2026-10-31 · ยังไม่เริ่ม |
+| วันที่ | 2026-10-31 |
+| แตะส่วนไหน | `DiskInfoCore/` (แยกชั้นแปลผลออกจากชั้น I/O, backend Linux/macOS) · CMake ใหม่ · `docs/ARCHITECTURE.md` · `docs/TESTING.md` |
+| เกี่ยวกับ | แทน [[R-001]] · [[R-016]] header เดียวกัน · [[R-017]] แอปบน Linux/macOS |
+
+**คุณระบุ:** ดู [[R-016]] ("ผมต้องการนำไปใช้กับ Linux, Mac" · "Windows → Linux → macOS" · "แทนที่ R-001")
+
+**ผมเข้าใจว่า:**
+1. core build ด้วย CMake ได้บน Linux (Ubuntu 21.04+/Debian 11+, g++ 10+, C++17 ตามที่ตัดสินใน [[R-001]]) และ macOS; Windows ยัง build ด้วย `.vcxproj` เดิมได้
+2. แยก logic แปลผลของ Crystal (ชื่อ attribute, เกณฑ์สุขภาพ, ตีความค่า NVMe) ออกจากชั้น I/O ของ Windows โดยคัดลอก/ย้ายเข้า `DiskInfoCore/` — ไม่แก้ `CrystalDiskInfo/`
+3. **Linux:** อ่าน ATA SMART ผ่าน `SG_IO` (SAT), NVMe ผ่าน NVMe admin ioctl, USB bridge ที่รองรับ SAT; ต้องใช้ root
+4. **macOS:** อ่านผ่าน IOKit (ATA SMART และ NVMe SMART ของดิสก์ภายใน); ข้อจำกัดที่รู้ก่อน: ดิสก์ USB ภายนอกส่วนใหญ่อ่าน SMART ไม่ได้
+5. ลำดับ: Linux ก่อน แล้ว macOS; แอป [[R-017]] รันบนทั้งสองได้
+6. **ต้องตกลงก่อนเริ่มเฟส macOS:** เวอร์ชัน macOS ขั้นต่ำ และ Intel/Apple Silicon
+
+**ไม่รวม:**
+- ไม่ทำ `.deb` / `.dmg` / ตัวติดตั้ง (ข้อแยก)
+- ไม่รองรับ RAID/CSMI/ตัวควบคุมพิเศษของ Crystal บน Linux/macOS
+- ไม่ยกระดับสิทธิ์เอง ไม่เขียนลงดิสก์
+- ไม่แก้ `CrystalDiskInfo/`
+
+**ตรวจรับเมื่อ:**
+- [ ] Ubuntu 21.04+ และ Debian 11+: `cmake -B build && cmake --build build` ผ่าน (เกณฑ์เดิมของ [[R-001]])
+- [ ] Linux เครื่องจริงแบบ root: SATA และ NVMe อ่านข้อมูลและ attribute ได้ ตรงกับ `smartctl -a` ของดิสก์เดียวกัน
+- [ ] Linux ไม่ใช่ root: คืน `DI_E_ACCESS` ไม่ crash
+- [ ] macOS: build ผ่าน และดิสก์ภายในอ่านได้ตรงกับ `smartctl -a`
+- [ ] แอป [[R-017]] เปิดและแสดงดิสก์ได้บน Linux และ macOS (ผู้ใช้ตรวจบนเครื่องจริง)
+- [ ] build Windows เดิม (`DiskInfo.sln`, `DiskInfoCore`) ไม่พัง
+
+**คำยืนยันของคุณ (2026-10-31):**
+> รับรอง
+
+## R-019 · โปรแกรมใหม่ใช้งานบน Windows PE ได้ และ GUI แบบเดียวกับ Disk-Cloning
+
+| | |
+|---|---|
+| สถานะ | ✅ ตกลงแล้ว 2026-10-31 · ยังไม่เริ่ม |
+| วันที่ | 2026-10-31 |
+| แตะส่วนไหน | แอป [[R-017]] (หน้าตา) · โปรแกรมใหม่: TUI เต็มจอ native C++ สำหรับ WinPE บน DiskInfoKit · DiskInfoKit/core กลาง build x86 + x64 · `docs/ARCHITECTURE.md` · `docs/TESTING.md` |
+| เกี่ยวกับ | [[R-016]] DiskInfoKit · [[R-017]] แอป Avalonia · Disk-Cloning R-010/R-012/R-017 (ต้นแบบ) |
+
+**คุณระบุ:**
+> 2. โปรแกรมใหม่ที่จะสร้าง ต้องสามารถนำไปใช้งานกับ WindowsPE ได้ และมีลักษณะของGUI เหมือน https://github.com/epinephrinerx/Disk-Cloning
+
+**คุณตอบคำถามของผม (2026-10-31):**
+> GUI เหมือน: ทั้งสองอย่าง · ใน WinPE: เมนูข้อความ native (Recommended) · ตาม Disk-Cloning: 32+64-bit · อนุญาต อ่านอย่างเดียว
+
+**สิ่งที่พบใน Disk-Cloning (อ่านอย่างเดียว 2026-10-31):** บน GitHub มีแค่เอกสาร โค้ดอยู่ในเครื่อง `D:\Dev\Apps\Disk Cloning` (branch `agent/integrator-fixes`, v0.1.3)
+- GUI (Windows): WinForms .NET Framework 4.8 หน้าต่างเดียว สไตล์ Windows คลาสสิก (สีระบบ) แบ่งเป็น GroupBox เรียงลงมา (Operation · Disks and Partitions · Output · Options) ปุ่ม Start/Cancel · progress bar · บรรทัดสถานะ · กล่อง log ฟอนต์ Consolas
+- WinPE: TUI เต็มจอ (Disk-Cloning R-012/R-017) พื้นดำ หัวเรื่อง `=== … ===` สีฟ้า แถบล่างสีเทาบอกปุ่มลัด แถวที่เลือกพื้นฟ้า ใช้ ↑/↓/PgUp/PgDn/Enter/Esc/B
+
+**ผมเข้าใจว่า:**
+1. **บน Windows ปกติ:** แอป Avalonia ของ [[R-017]] จัดหน้าตาให้เหมือน GUI ของ Disk-Cloning — หน้าต่างเดียว สไตล์คลาสสิกสีระบบ (ไม่ใช้ธีม Fluent) แบ่งส่วนเป็นกรอบมีหัวข้อแบบ GroupBox, ส่วนแสดงข้อความ/ตารางใช้ฟอนต์ monospace, มีบรรทัดสถานะ ความสามารถของ [[R-017]] (ตาราง attribute, กราฟ, แจ้งเตือน, ไทย/อังกฤษ) คงเดิม
+2. **ใน WinPE:** โปรแกรม TUI เต็มจอ เขียนด้วย C++ native เรียก DiskInfoKit ([[R-016]]) โดยตรง ไม่ต้องมี .NET ใน WinPE หน้าตาและปุ่มลัดแบบ TUI ของ Disk-Cloning: รายการดิสก์ → หน้ารายละเอียด/สุขภาพ → ตาราง SMART attribute ใช้คีย์บอร์ดอย่างเดียว
+3. TUI เป็นภาษาอังกฤษ (ผมเลือกเพราะ console ของ WinPE ไม่มีฟอนต์ไทย และ TUI ของ Disk-Cloning ก็เป็นอังกฤษ)
+4. **32-bit และ 64-bit:** DiskInfoKit/core กลาง และ TUI build ได้ทั้ง x86 และ x64 ตาม WinPE ของ Disk-Cloning (ADK 2004)
+5. ใน WinPE ต้องมี WinPE-WMI (core ของ Crystal ใช้ WMI) — ถ้าไม่มี TUI แจ้งชัดว่าขาดอะไร ไม่ crash
+6. "นำไปใช้กับ WinPE ได้" = คัดลอกไฟล์โปรแกรม (portable ไม่ต้องติดตั้ง) ไปรันใน WinPE ได้ — ผมเลือกความหมายนี้เพราะตรงตัวที่สุด
+
+**ไม่รวม:**
+- ไม่ทำตัวสร้างสื่อบูต WinPE (ISO/USB/CD) ของ DiskInfo เอง และไม่ฝังเข้าสื่อบูตของ Disk-Cloning (ถ้าต้องการให้เปิดข้อใหม่)
+- ไม่มี GUI ใน WinPE (แบบเดียวกับ Disk-Cloning R-012)
+- ไม่มีกราฟ/ประวัติ/แจ้งเตือนใน TUI (ประวัติใน WinPE หายเมื่อรีบูต)
+- ไม่เปลี่ยนเทคโนโลยีของ [[R-017]] เป็น WinForms (ต้องใช้บน Linux/macOS ตาม [[R-018]]) และไม่รองรับ Windows 7 (ไม่ได้ระบุ)
+- ไม่แก้อะไรใน repo Disk-Cloning
+
+**ตรวจรับเมื่อ:**
+- [ ] ภาพหน้าจอแอป Windows วางคู่กับ GUI ของ Disk-Cloning แล้วคุณเห็นว่าลักษณะเหมือนกัน (คุณตรวจ)
+- [ ] TUI build ได้ทั้ง x86 และ x64 และ DiskInfoKit/core กลางทั้งสองสถาปัตยกรรม
+- [ ] บูต WinPE (ADK 2004, มี WinPE-WMI) ใน VM ทั้ง 32-bit และ 64-bit คัดลอกโปรแกรมเข้าไปแล้วรัน TUI ได้ เห็นดิสก์ของ VM พร้อมสุขภาพและตาราง attribute (ดิสก์เสมือนอาจไม่มี SMART จริง — ต้องแสดงว่าไม่มีข้อมูล ไม่ crash)
+- [ ] WinPE ที่ไม่มี WinPE-WMI: TUI แจ้งว่าขาดอะไร ไม่ crash
+- [ ] ใช้งาน TUI ด้วยคีย์บอร์ดได้ครบ ปุ่มลัดและสีแบบเดียวกับ TUI ของ Disk-Cloning
+- [ ] บนเครื่องจริงที่บูต WinPE: ค่าของดิสก์จริงตรงกับแอปบน Windows ([[R-016]]) (คุณตรวจ)
+
+**คำยืนยันของคุณ (2026-10-31):**
+> รับรอง
