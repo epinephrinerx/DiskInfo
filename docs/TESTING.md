@@ -42,9 +42,17 @@ $k='C:\Program Files (x86)\Windows Kits\10'; $v='10.0.26100.0'
 
 ผล (2026-10-12): Build succeeded 0 error 0 warning, `DiskInfoCore.dll` ~598 KB, export 6 ชื่อ ทดสอบเรียกจริงด้วยสคริปต์ P/Invoke (ไม่อยู่ใน repo — ยังไม่มี test อัตโนมัติ): สิทธิ์ปกติ → `di_scan` คืน `DI_E_ACCESS` (-2) และ 0 ดิสก์; admin → 3 ดิสก์ (TOSHIBA SATA, WDS NVMe, Seagate USB ผ่าน SAT) health = Good ทั้งหมด ใช้เวลา 3.1–4.3 วินาที และไฟล์ `.log` ข้าง host ไม่ถูกลบ ดูรายละเอียดและข้อสังเกตที่ `docs/CORE_ABI.md`
 
+**DiskInfo.Kit** (R-016 เฟส 3, .NET binding ของ `DiskInfoKit.dll`) — test อัตโนมัติชุดแรกใน repo นี้ (MSTest, `net10.0`) build `DiskInfoKit` แบบ Release x64 ก่อน (คำสั่งเดียวกับข้างบนแต่ชี้ `DiskInfoKit\DiskInfoKit.vcxproj`) เพื่อให้ test คัดลอก `DiskInfoKit\Build\Releasex64\DiskInfoKit.dll` ไปข้าง test:
+
+```powershell
+dotnet test DiskInfo.Kit.Tests
+```
+
+ผล (2026-10-31, สิทธิ์ปกติ): 62 ผ่าน 0 ข้าม 0 warning ทั้ง Debug และ Release · test ที่เรียก DLL จริงจะเป็น Inconclusive (นับเป็นข้าม) เมื่อไม่มี `DiskInfoKit.dll` ข้าง test (ยังไม่ได้ build) หรือเมื่อ test host ไม่ใช่ x64 (คัดลอกแค่ DLL x64) — ข้ามมากกว่า 0 ให้ตรวจสองข้อนี้; test ฝั่ง admin (`Environment.IsPrivilegedProcess`) ต้องรันจากเชลล์ที่ยกระดับเอง
+
 ข้อกำหนดเบื้องต้น:
 
-- Runtime: .NET SDK 10.0.401 (เป้าหมาย `net8.0-windows`), MSVC ผ่าน VS Build Tools 2026 (toolset v145, มี MFC/ATL แล้ว)
+- Runtime: .NET SDK 10.0.401 ขึ้นไป (SystemMonitor เป้าหมาย `net8.0-windows`; `DiskInfo.Kit` เป้าหมาย `net10.0`), MSVC ผ่าน VS Build Tools 2026 (toolset v145, มี MFC/ATL แล้ว)
 - Package manager: N/A
 - Services ที่ต้องใช้: NONE
 - ตัวแปร environment: ดู `.env.example`; ห้ามใช้ production credentials
@@ -54,7 +62,9 @@ $k='C:\Program Files (x86)\Windows Kits\10'; $v='10.0.26100.0'
 | Level | Purpose | Location | Command |
 |---|---|---|---|
 | Unit | logic ฝั่งผู้ใช้ DLL (แปลง sentinel, state, หน้าจอ) | `D:DevAppsSystemMonitor4.0SysMonitor.Tests` (MSTest, ไม่ใช่ใน repo นี้) | `dotnet test SysMonitor.Tests` |
-| Integration | DLL จริง: โหลด, สแกน, struct layout | ยังไม่มี test อัตโนมัติใน repo นี้; ตรวจ struct (160 B, `power_on_hours` ที่ 144) ใน `SmartFallbackTests` ของ SystemMonitor และเรียก P/Invoke ด้วยสคริปต์ครั้งเดียว | ดูหัวข้อ 8 |
+| Unit + Contract (DiskInfoKit) | layout 496/48, ค่าคงที่เทียบ `diskinfokit.h`, การแปลงค่า, ตารางชื่อ attribute | `DiskInfo.Kit.Tests` (MSTest) | `dotnet test DiskInfo.Kit.Tests` |
+| Integration (DiskInfoKit) | `DiskInfoKit.dll` จริงผ่าน binding: เวอร์ชัน, เปิด/ปิด, สแกนแบบไม่ใช่ admin → Access, สแกนขนานไม่ deadlock | `DiskInfo.Kit.Tests/NativeTests.cs` | `dotnet test DiskInfo.Kit.Tests` |
+| Integration | DLL จริง: โหลด, สแกน, struct layout | DiskInfoCore ยังไม่มี test อัตโนมัติใน repo นี้; ตรวจ struct (160 B, `power_on_hours` ที่ 144) ใน `SmartFallbackTests` ของ SystemMonitor และเรียก P/Invoke ด้วยสคริปต์ครั้งเดียว | ดูหัวข้อ 8 |
 | Contract/API | ABI ตาม `docs/CORE_ABI.md` | `SysMonitor.Tests/SmartModuleTests.cs` ตรวจ search path ของ P/Invoke และการแปลงฟิลด์ native | `dotnet test SysMonitor.Tests` |
 | End-to-end | แอปจริงแบบ admin เห็นข้อมูลดิสก์ | ยังไม่มี test อัตโนมัติ; ตรวจด้วยมือและภาพหน้าจอ (หัวข้อ 8) | ดูหัวข้อ 8 |
 | Smoke | ตรวจหลัง build | `build-wpf.cmd` (รัน test ก่อน แล้ว publish และสร้าง installer ที่รวม DLL) | `build-wpf.cmd` ใน `SystemMonitor4.0` |

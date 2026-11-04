@@ -38,8 +38,10 @@
 7. **สิทธิ์ (Elevation)**:
    - การอ่าน S.M.A.R.T. ต้องใช้สิทธิ์ Administrator บน Windows
    - หากรันโดยไม่มีสิทธิ์และไม่พบดิสก์ `dik_scan` คืนค่า `DIK_E_ACCESS` (`-2`)
-8. **Read-only**:
-   - การส่งคำสั่ง IOCTL ทั้งหมดเป็นการอ่านข้อมูลเท่านั้น ไม่มีการเขียนข้อมูลลงดิสก์
+8. **ไม่เขียนข้อมูลลงดิสก์ (แต่ไม่ใช่อ่านอย่างเดียว 100%)**:
+   - ไม่มีคำสั่งเขียนข้อมูลหรือ sector ใด ๆ ลงดิสก์
+   - เมื่ออ่าน SMART ไม่สำเร็จ `CAtaSmart` ส่ง SMART ENABLE OPERATIONS (เปิดฟังก์ชัน SMART ของดิสก์) แล้วลองอ่านใหม่ เหมือน GUI ของ CrystalDiskInfo (`AtaSmart.cpp:3274` → `ControlSmartStatusPd(..., ENABLE_SMART)`) ซึ่งเปลี่ยนค่าตั้งของอุปกรณ์ได้
+   - การสแกนอาจเริ่ม service WMI ของ Windows
 
 ---
 
@@ -280,3 +282,35 @@ int DIK_CALL dik_attribute(const dik_handle* h, int disk, int row, dik_attribute
 ชื่อ Attribute ไม่ได้ถูกส่งผ่าน C API นี้ เนื่องจาก CrystalDiskInfo อ่านชื่อภาษาจากไฟล์การแปลภาษาภายนอกตามหมวดหมู่:
 - คีย์สำหรับค้นหาคือ: `[smart_key]` + `[id ในรูปเลขฐานสิบหก 2 หลัก เช่น "05", "C5"]`
 - ตัวอย่าง: ไดรฟ์รายงาน `smart_key = "SmartNVMe"` และ attribute `id = 0x01` ให้ค้นหา section `[SmartNVMe]` key `01` ในตารางภาษาของแอปพลิเคชัน
+
+---
+
+## .NET binding (`DiskInfo.Kit`)
+
+ไลบรารี managed binding สำหรับ .NET 10 (`DiskInfo.Kit` อยู่ที่ไดเรกทอรี `DiskInfo.Kit/`) ครอบสัญญา C API ของ `DiskInfoKit` ทั้งหมด และเป็นเจ้าของตารางชื่อ attribute ภาษาอังกฤษ:
+
+- **ที่ตั้งและการอ้างอิง**:
+  - โปรเจกต์ `DiskInfo.Kit/DiskInfo.Kit.csproj` (Target `net10.0`, ไม่มี external NuGet package dependency)
+  - ทดสอบด้วยชุดเทสต์ MSTest ที่ `DiskInfo.Kit.Tests/DiskInfo.Kit.Tests.csproj`
+- **การแมปชนิดข้อมูล (Type Map)**:
+  - ค่า sentinel `DIK_NA` และ `DIK_NA64` ถูกแปลงเป็น `null` (`int?` / `long?`)
+  - รหัสตัวเลขถูกแปลงเป็น managed enums โดยค่าที่ไม่รู้จักจะแมปเป็น `Unknown` เฉพาะกรณีของ `InterfaceKind`, `MediaType`, `HealthStatus` และ `AttributeStatus`
+  - `AccessLevel` และ `DiskFeatures` จะคงค่าดิบ (raw value / bitmask cast) ไว้
+  - รหัสข้อผิดพลาด native ที่ไม่รู้จักจะแมปเป็น `KitError.Io` โดยยังคงค่า `NativeCode` เดิมไว้
+  - ข้อมูลสตริง UTF-8 ถูกแปลงเป็น .NET string โดยตัดที่ byte 0 (NUL) แรก และไม่ throw เมื่อพบ invalid byte (แทนที่ด้วย U+FFFD)
+  - `SmartAttribute.Raw` และ `DiskSnapshot.Attributes` เป็น immutable snapshot (`ReadOnlyCollection<T>` จากสำเนา private ป้องกันการแคสต์กลับเป็น mutable array หรือ list) โดย `Raw` ถูกตัดความยาวตาม `raw_len` ที่ถูก clamp ให้อยู่ในช่วง 0..8 ไบต์ ป้องกันการอ่านเกินขอบเขต
+- **ตารางชื่อ Attribute (`AttributeNames`)**:
+  - คืนค่า `null` (แสดงผล "Vendor Specific") เฉพาะกรณีที่ระบุคีย์เป็น `null`/สตริงว่าง หรือเป็นรหัส ID ที่ไม่มีอยู่ในตารางที่ใช้งาน
+  - รองรับตาราง `"SmartNVMe"` (อ้างอิงรหัส attribute ตาม NVMe spec และ `CrystalDiskInfo/NVMeInterpreter.cpp`) และตาราง `"Smart"` (ATA ทั่วไป) โดยผลลัพธ์มี `IsGeneric = false`
+  - คีย์ประเภท vendor-specific อื่น ๆ ที่ไม่ใช่ค่าว่าง (~48 คีย์) จะ fallback ไปค้นหาในตาราง `"Smart"` โดยตั้งค่า `IsGeneric = true`
+  - คีย์ `"SmartNVMe"` จะไม่มีการ fallback ไปหาตารางอื่นโดยเด็ดขาด หากไม่พบรหัส attribute จะคืนค่า `null`
+- **การจัดการ Threading และ `ScanAsync`**:
+  - `DiskInfoKitSession.Scan()` ถูก serialize ทั่วทั้ง process ด้วย static lock ภายใน library ป้องกัน race condition ระดับ COM และไดรเวอร์
+  - lock เป็นแบบ per AssemblyLoadContext (ควรโหลด binding เพียงครั้งเดียวต่อโพรเซส)
+  - `DiskInfoKitSession.ScanAsync()` รันคำสั่งสแกนบน dedicated thread แยกต่างหาก (`TaskCreationOptions.LongRunning`) ไม่บล็อก UI thread และไม่ขโมย thread pool worker
+  - `Dispose()` จะบล็อกจนกว่าการสแกน (`Scan`) ที่กำลังทำงานอยู่บนเซสชันเดียวกันจะเสร็จสิ้น และเป็น idempotent ป้องกันการปิด native handle ระหว่างที่ `Scan()` ของเซสชันนั้นกำลังทำงานอยู่
+- **การค้นหา Native DLL (`DiskInfoKit.dll`)**:
+  - บน Windows ใช้ `[DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.System32)]` ค้นหาเฉพาะโฟลเดอร์ของ binding (และโฟลเดอร์เนทีฟตาม deps.json ของแอป) แล้วจึงค้นหาที่ System32 ไม่โหลดจาก CWD หรือ PATH เพื่อความปลอดภัย
+  - บน Linux/macOS กลไกการค้นหาปกติของ platform loader (รวมถึง `LD_LIBRARY_PATH`) จะยังคงทำงานต่อหลังจากค้นหาในโฟลเดอร์ของ binding แล้ว — การ hardening เพิ่มเติมเป็นงานของ R-018
+- **หมายเหตุ Manifest (Windows)**:
+  - ตัวรันหลัก (.exe) บน Windows ต้องประกาศ `<supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>` (Windows 10) ใน Application Manifest เพื่อให้ Windows API ตรวจพบเวอร์ชันถูกต้องและแสดงผลไดรฟ์ NVMe

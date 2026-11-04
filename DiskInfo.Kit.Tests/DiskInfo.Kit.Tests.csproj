@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>DiskInfo.Kit.Tests</RootNamespace>
+    <AssemblyName>DiskInfo.Kit.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.1.1" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DiskInfo.Kit\DiskInfo.Kit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\DiskInfoKit\Build\Releasex64\DiskInfoKit.dll" Link="DiskInfoKit.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" Condition="Exists('..\DiskInfoKit\Build\Releasex64\DiskInfoKit.dll')" />
+  </ItemGroup>
+
+</Project>
